@@ -1,283 +1,296 @@
-class ListNode:
-    def __init__(self, data=None, next=None, prev=None):
-        self.data = data
-        self.next = next
-        self.prev = prev
+from __future__ import annotations
+import ctypes
 
-    def __repr__(self):
-        return f'<ListNode: {self.data}>'
-
-    def __str__(self):
-        return str(self.data)
-
-
-class DoublyLinkedList:
-    def __init__(self):
-        self._head = self._tail = None
-        self._size = 0
-
-    def __repr__(self):
-        current_node = self._head
-        values = ''
-        while current_node:
-            values += f', {current_node.data}'
-            current_node = current_node.next
-        plural = '' if self._size == 1 else 's'
-        return f'<DoublyLinkedList ({self._size} element{plural}): [{values.lstrip(", ")}]>'
-
-    def __len__(self):
-        return self._size
-
-    def __iter__(self):
-        self._iter_index = self._head
-        return self
-
-    def __next__(self):
-        if self._iter_index:
-            value = self._iter_index.data
-            self._iter_index = self._iter_index.next
-            return value
-        else:
-            raise StopIteration
-            
-    def __getitem__(self, index):
+class ReservedMemory():
+    """
+    A class to reserve and handle a contigous area of memory. The
+    constructor needs the size of the memory area (in bytes) to be
+    reserved.
+    """
+    def __init__(self, size: int) -> None:
         """
-        Return value at index
+        Initialize object allocating a memory area of given size
         """
-        # Check if index is inside bounds
-        if index < 0 or index >= self._size:
-            raise(ValueError('Index out of bounds'))
-
-        # Move to the given index
-        current_node = self._head
-        for _ in range(index):
-            current_node = current_node.next
+        if not isinstance(size, int):
+            raise(TypeError('Memory size must be a positive integer > 0!'))
+        if not 1 <= size <= 65536:
+            raise(ValueError('Reserved memory size must be between 1 and 65536 bytes!'))
         
-        # Return the value
-        return current_node.data
+        self._reserved_memory = ctypes.create_string_buffer(size)
 
-    def __setitem__(self, index, value):
+    def __len__(self) -> int:
+        return len(self._reserved_memory)
+
+    def __repr__(self) -> str:
+        """
+        Custom representation of the reserved memory area
+        """
+        l = len(self._reserved_memory)
+        plural = 's' if l>1 else ''
+        str_repr = f"[{', '.join(str(ord(i)) for i in self._reserved_memory)}]"
+        return f"ReservedMemory ({l} byte{plural}): {str_repr}"
+
+    def copy(self, mem_source:ReservedMemory, count:int=None, source_index:int=0, destination_index:int=0) -> None:
+        """
+        Copy the content of another ReservedMemory object (mem_source)
+        to this object's memory area. By default the whole source memory
+        area is copied to the start of this object's memory area.
+        
+        Parameters:
+        - mem_source: ReservedMemory source object (mandatory)
+        - count: How many bytes or positions to copy.
+                 Optional. Default: Source size - source_index
+                 If not provided, copy from the beginning or source_index
+                 until the end of source.
+        - source_index: Source's start index or from where to copy the
+                        content.
+                        Optional. Default: 0
+        - destination_index: Destination's start index or where to copy
+                             the content.
+                             Optional. Default: 0
+
+        Usage example:
+        # Copy source to the start of destination
+        destination.copy(source)
+
+        # Copy only 5 memory positions of source
+        destination.copy(source, count=5)
+        # or
+        destination.copy(source, 5)
+        
+        # Copy source to destination starting at index 10
+        destination.copy(source, destination_index=10)
+
+        # Copy the first 5 memory positions of source to destination's index 10
+        destination.copy(source, count=5, destination_index=10)
+
+        # Copy 5 memory positions from source index 7 to destination's
+        # index 10
+        destination.copy(source, count=5, source_index=7, destination_index=10)
+        # or
+        destination.copy(source, 5, 7, 10)
+
+        Copy area can't fall outside the bounds of the destination's
+        memory area.
+        """
+        
+        if not isinstance(mem_source, ReservedMemory):
+            return TypeError('Source object must be a ReservedMemory object')
+        
+        if count is None:
+            count = len(mem_source._reserved_memory) - source_index
+        elif not isinstance(count, int):
+            return TypeError('Count must be a positive integer > 0')
+        elif count <= 0:
+            return ValueError('Count must be a positive integer > 0')
+        
+        if not isinstance(source_index, int):
+            return TypeError('Source index must be a positive integer >= 0')
+        elif 0 > source_index >= len(mem_source._reserved_memory):
+            return IndexError('Source index out of bounds!')
+
+        if not isinstance(destination_index, int):
+            return TypeError('Destination index must be a positive integer >= 0')
+        elif 0 > destination_index >= len(self._reserved_memory):
+            return IndexError('Destination index out of bounds!')
+
+        if count > len(self._reserved_memory):
+            return IndexError('Source is bigger than destination!')
+        elif source_index + count > len(mem_source._reserved_memory):
+            return IndexError('Source copy area out of bounds!')
+        elif destination_index + count > len(self._reserved_memory):
+            return IndexError('Destination copy area out of bounds!')
+
+        self._reserved_memory[destination_index:destination_index+count] = mem_source._reserved_memory[source_index:source_index+count]
+
+    def __getitem__(self, k:int) -> int:
+        """
+        Return value at index k
+        """
+        if not isinstance(k, int):
+            raise TypeError('Index must be a positive integer >= 0')
+        elif not 0 <= k < len(self._reserved_memory):
+            raise IndexError('Index is out of bounds!')
+        
+        return ord(self._reserved_memory[k])
+
+    def __setitem__(self, k:int, val:int) -> None:
         """
         set value at index k with val
         """
-        # Check if index is inside bounds
-        if index < 0 or index >= self._size:
-            raise(ValueError('Index out of bounds'))
+        if not isinstance(k, int):
+            raise TypeError('Index must be a positive integer >= 0')
+        elif not (0 <= k < len(self._reserved_memory)):
+            raise IndexError('Index is out of bounds!')
+        
+        self._reserved_memory[k] = val
 
-        # Move to the given index
-        current_node = self._head
-        for _ in range(index):
-            current_node = current_node.next
+class IntArray():
+    """
+    A class to implement an Array Data Structure that accepts integer values
+    between -(2**(n-1)) and (2**(n-1))-1 (being n the number of bits per element).
+    By default, element size is 2 bytes (16 bits), so accepted values go
+    from -(2**15) to (2**15)-1, that is from -32768 to 32767. 
+    Python does not have a internal type with these characteristics, so values
+    are accepted as normal Python int type and then converted to be stored.
 
-        # Set the value
-        current_node.data = value
+    IntArray uses static arrays to hold the values, but allows to expand or
+    shrunk the array internally copying the values to a new static array.
 
-    def append(self, value):
-        """
-        Append a value to the end of the list
+    Parameters (IntArray creation):
+    - bytes_per_element: How many bytes per element should be reserved. 
 
-        Parameters:
-        - 'value': The data to append
+    Supported methods:
+    - Array creation
+    - Append: Insert at the end
+    - Pop: Delete from the end
+    """
 
-        Returns: None
-        """
-        # Create the node with the value. This is the last node, so next is None,
-        # but there can be already some node in the list, hence the prev value
-        new_node = ListNode(value, next=None, prev=self._tail)
+    def __init__(self, bytes_per_element:int = 2) -> None:
+        self._resmem = None
+        self._size = 0  # Logical size
+        self._bytes_per_element = bytes_per_element
+        self._shift_val = 2**((self._bytes_per_element * 8)-1)
+        self._min_val = -self._shift_val
+        self._max_val = self._shift_val - 1
 
-        # If list is empty, update head and tail pointers
-        if self._head is None:
-            self._head = self._tail = new_node
+    def __len__(self) -> int:
+        return self._size
+
+    def __iter__(self):
+        self._iter_index = 0
+        return self
+
+    def __next__(self) -> int:
+        if self._iter_index < self._size:
+            self._iter_index += 1
+            return self.__getitem__(self._iter_index-1)
         else:
-            # In any other case, update tail node to point to the new element
-            # and update tail pointer. The new node already points to its
-            # previous element
-            self._tail.next = new_node
-            self._tail = new_node
+            raise StopIteration
 
-        # update size
+    def __repr__(self) -> str:
+        """
+        Custom representation of the IntArray
+        """
+        if not self._resmem:
+            return "Empty IntArray"
+        l = self._size
+        plural = 's' if l>1 else ''
+        str_repr = f"[{', '.join(str(v) for v in self)}]"
+        return f"IntArray ({l} element{plural}): {str_repr}"
+
+    def __setitem__(self, k:int, val:int) -> None:
+        """
+        Set value at index k with val.
+        """
+        if not isinstance(val, int) or not self._min_val <= val <= self._max_val:
+            raise TypeError(f'Value must be an integer between {self._min_val} and {self._max_val}')
+
+        # Convert or shift the value to be suitable to be stored.
+        # Value to be stored must be in the positive range from 0 to (2**bits_per_element)-1
+        # For 2 bytes that is from 0 to 65535
+        val_to_store = val + self._shift_val
+        # Store the bytes of the value in Little-endian (https://en.wikipedia.org/wiki/Endianness)    
+        for byte_index in range(self._bytes_per_element):
+            self._resmem[k*self._bytes_per_element+byte_index] = (val_to_store >> (8*byte_index)) & 255
+
+    def __getitem__(self, k:int) -> int:
+        """
+        Return value at index k
+        """
+
+        # Read stored bytes in Little-endian and restore original value
+        stored_val = 0
+        for byte_index in range(self._bytes_per_element):
+            stored_val |= self._resmem[k*self._bytes_per_element+byte_index] << (8*byte_index)
+        return (stored_val - self._shift_val)
+
+    def append(self, val: int) -> None:
+        """
+        Append an element to the end of the array
+        """
+        if not isinstance(val, int) or not self._min_val <= val <= self._max_val:
+            raise TypeError('Value must be an integer between {self._min_val} and {self._max_val}')
+        
+        # Update array's size
         self._size += 1
 
-    def pop(self):
+        # Reserve a new memory area with the new size.
+        # It is _bytes_per_element bigger than the current one
+        new_resmem = ReservedMemory(self._size*self._bytes_per_element)
+
+        # Copy the old reserved memory area (if there was one)
+        if self._resmem:
+            new_resmem.copy(self._resmem)
+
+        # The new created reserved memory area will be the one to be used
+        # from now on
+        self._resmem = new_resmem
+
+        # Store the new value at the end of the array
+        self.__setitem__(self._size-1, val)
+
+    def pop(self) -> int:
         """
-        Removes the last node of the list
-        
-        Parameters: None
-        
-        Returns:
-            The content of the removed node. If list is empty, returns None
+        Remove an element from the end of the array and return its value
         """
-        # If list is empty, returns None
-        if not self._size:
-            return None
-        
-        # Locate previous_node (the node just before last node)
-        node_to_remove = self._tail
-        previous_node = node_to_remove.prev
-
-        # If node to remove is first node, then update head pointer
-        if node_to_remove == self._tail:
-            self._head = None
-        else:
-            # If not, update the pointer of the previous node
-            previous_node.next = None   # It is now the last node
-
-        # Update tail pointer
-        self._tail = previous_node
-
-        # Update size, remove node and return its content
-        self._size -= 1
-        value = node_to_remove.data
-        del(node_to_remove)
-        return value
-
-    def insert(self, index, value):
-        """
-        Insert a new node with value in the position given by the index
-
-        Parameters:
-        - 'index': The position where to insert the new node
-        - 'value': The value of the new node
-
-        Returns: None
-        """
-        # Check if index is inside bounds
-        if index < 0 or index > self._size:
-            raise(ValueError('Index out of bounds'))
-
-        # Prepare some variables to make the necessary changes
-        # The new node will be inserted between previous_node and next_node
-        previous_node = None
-        next_node = self._head
-        # Move to the given index and update pointer variables
-        for _ in range(index):
-            previous_node = next_node
-            next_node = next_node.next
-
-        # Create new node with right value and pointers
-        new_node = ListNode(value, prev=previous_node, next=next_node)
-
-        # If insert at front, update head
-        if previous_node is None:
-            self._head = new_node
-        else:
-            # If not, update previous node
-            previous_node.next = new_node
-        
-        # If insert at the end, update tail
-        if next_node is None:
-            self._tail = new_node
-        else:
-            # If not, update next node
-            next_node.prev = new_node
-
-        # Update list size
-        self._size += 1
-
-    def remove_by_value(self, value):
-        """
-        Remove first node with given value and return its position
-        """
-        # Find if there is a node with given value
-        current_node = self._head
-        index = 0
-        while current_node and current_node.data != value:
-            current_node = current_node.next
-            index += 1
-        
-        # If value was not found, current_node is None
-        if not current_node:
-            return None
-
-        previous_node = current_node.prev
-        next_node = current_node.next
-
-        # If node to remove is the first node, update head
-        if previous_node is None:
-            self._head = next_node
-        else:
-            # If not, update previous node
-            previous_node.next = next_node
-
-        # If node to remove is last node, update tail
-        if next_node is None:
-            self._tail = previous_node
-        else:
-            # If not, update next node
-            next_node.prev = previous_node
-
-        # Update size, remove the node and return its index
-        self._size -= 1
-        del(current_node)
-        return index
-
-    def contains(self, value):
-        """
-        Returns True if value if found in the list and False if not
-        """
-        for node_value in self:
-            if value == node_value:
-                return True
-        return False
-
-    def clear(self):
-        """
-        Clear the list
-        """
-        # Remove all nodes
-        current_node = self._head
-        while current_node:
-            next = current_node.next
-            del(current_node)
-            current_node = next
-
-        # Update pointers and size
-        self._head = self._tail = None
-        self._size = 0
-
-    def remove(self, index):
-        """
-        Remove a new node from the position given by the index
-
-        Parameters:
-        - 'index': The position where to insert the new node
-
-        Returns: The value of the node being removed
-        """
-        # Tarkistetaan indexin oikeellisuus
-        if index < 0 or index > self._size:
-            raise ValueError('Index out of bounds')
-        
-        # Jos lista on tyhjä
+        # Elements can not be removed from empty arrays
         if self._size == 0:
-            raise ValueError('List is empty')
+            return None
+
+        # Get the last element's value
+        val = self.__getitem__(self._size-1)
         
-        # Loopataan indexiin asti
-        current_node = self._head
-        for _ in range(index):
-            current_node = current_node.next
-            
-        # Määritellään löydetystä indexistä edellinen ja seuraava
-        previous = current_node.prev
-        next = current_node.next
-        
-        # Jos on head, päivitetään seuraava node headiksi
-        if previous is None:
-            self._head = next
-        else:
-            # Jos ei, poistettavaa nodea edellinen node osoittaa poistettavaan nodeen
-            # laitetaan poistettavaa nodea edellinen node osoittamaan poistettavaa nodea seuraavaan nodeen
-            previous.next = next
-        
-        # Jos poistettava on viimeinen node, laitetaan poistettavaa nodea edeltävä tailiksi
-        if next is None:
-            self._tail = previous
-            # Jos ei ole viimeinen, laitetaan poistettavaa nodea seuraava node osoittamaan
-            # poistettavaa nodea edeltävään nodeen
-        else:
-            next.prev = previous
-            
+        # Decrease the size of the array
         self._size -= 1
-        value = current_node.data
-        del current_node
-        return value
+
+        # Find out the need for reserved memory
+        if self._size > 0:
+            # if new size is still bigger than 0
+            # reserve a new memory area with the new size.
+            # It is _bytes_per_element smaller than the current one
+            new_resmem = ReservedMemory(self._size*self._bytes_per_element)
+            # And copy the old memory area (except last element)
+            new_resmem.copy(self._resmem, count=self._size*self._bytes_per_element)
+        else:
+            # If new size is 0, there is no need to reserve memory for it
+            new_resmem = None
+
+        # Make the new memory area value the current one
+        self._resmem = new_resmem
+
+        # Return the last element's value that was stored at the beginning
+        return val
+    
+    def insert(self, index:int, val:int) -> None:
+        # Insert an element at the specified index in the array
+        
+        # Tarkistetaan että on int ja että on oikeella rangella että saa lisätä listaan
+        if not isinstance(val, int) or not self._min_val <= val <= self._max_val:
+            raise TypeError(f"Value must be an integer and between {self._min_val} and {self._max_val}.")
+        
+        # Tarkistetaan että index on int.
+        if not isinstance(index, int):
+            raise TypeError(f"Index should be a positive integer.")
+        if index < 0 or index > self._size:
+            raise IndexError("Index is out of range.")
+        
+        # Kasvatetaan listan kokoa yhdellä koska on lisätty yksi
+        self._size += 1
+        
+        # Lasketaan tila jota tarvitaan kaikkien IntArray elementtien säilyttämiseen
+        new_reserved_memory = ReservedMemory(self._size * self._bytes_per_element)
+        
+        # Kopioidaan vanhasta muistista elementit siihen pisteeseen asti minne insertataan
+        if index > 0:
+            new_reserved_memory.copy(self._resmem, count = index * self._bytes_per_element)
+            
+        # Kopioidaan loput elementit inserttaamisen jälkeen sen jälkeiseen tilaan
+        #if index < self._size - 1:
+        new_reserved_memory.copy(self._resmem, count = (self._size - index - 1) * self._bytes_per_element, source_index=index * self._bytes_per_element, destination_index=(index + 1) * self._bytes_per_element)
+        
+        # Tehdään uudesta kopiosta "the" resmem
+        self._resmem = new_reserved_memory
+
+        # Liitetään uusi arvo tiettyyn indexiin
+        self.__setitem__(index, val)
