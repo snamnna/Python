@@ -1,3 +1,6 @@
+from ctypes import sizeof
+
+
 class HashItem():
     def __init__(self, key, value):
         self.key = key
@@ -94,4 +97,24 @@ class HashTable():
 
         Returns: None
         """
-        pass
+        
+        # Katsotaan ensin onko lista täynnä
+        if self.used_slots == self.size:
+            raise(MemoryError("Table is full already"))
+        
+        # Haetaan avaimelle hash arvo
+        hash = self._hash(key)
+        
+        # Etsitään avain hash arvosta
+        searched = self._find_key(hash, key)
+        
+        # Jos edellisessä löydetty paikka ei ole tehjä, arvo updatetaan
+        if searched is not None:
+            self.slots[searched].value = value
+        # Jos avainta ei löydy, etsitään vapaa paikka
+        else:
+            searched = self._find_free_slot(hash)
+            # Lisätään uusi arvo taulukkoon
+            self.slots[searched] = HashItem(key, value)
+            # Laitetaan yksi paikka lisää käytetyksi
+            self.used_slots += 1
